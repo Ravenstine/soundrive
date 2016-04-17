@@ -2,42 +2,43 @@ class Soundrive
 
   class @Oscillator
     constructor: (options={}) ->
-      @values = 
-        currentFrequency : 0
+      @values =
+        frequency        : 0
         sampleRate       : 44100
         type             : 'sine'
-        sweepSize        : 0
+        sweep            : 0
         phi              : 0
         delta            : 0
         fDelta           : 0
+        amplitude        : 100 # percent
+        easeIn           : 0
+        easeOut          : 0
       for option of options
         @values[option] = options[option]
-      @values.previousFrequency ||=  @values.currentFrequency
-      @values.targetFrequency   ||=  @values.currentFrequency
+      @values.previousFrequency ||=  @values.frequency
+      @values.targetFrequency   ||=  @values.frequency
+      @values.sweepIn  = @values.sweep
+      @values.sweepOut = @values.sweep
       @sample    = undefined
       @callbacks = {}
 
     changeFrequency: (frequency) ->
-      @values.previousFrequency = @values.currentFrequency
+      @values.previousFrequency = @values.frequency
       @values.targetFrequency   = frequency
 
     oscillate: (record=true)->
-      @sample          = Math.sin(@values.phi)
-      @values.delta    = 2 * Math.PI * @values.currentFrequency / @values.sampleRate
-      unless @isAtTargetFrequency()
-        @values.fDelta = ( @values.targetFrequency - @values.previousFrequency ) / (@values.sampleRate * @values.sweepSize)
-        @values.currentFrequency += @values.fDelta
-      else
-        @values.currentFrequency = @values.targetFrequency
+      @sample          = Math.sin(@values.phi) * (@values.amplitude / 100)
+      @values.delta    = 2 * Math.PI * @values.frequency / @values.sampleRate
+      @_increment 'frequency', 'sweep'
       @values.phi              += @values.delta
       @sample
 
     isAtTargetFrequency: ->
-      if @values.currentFrequency != @values.targetFrequency
+      if @values.frequency != @values.targetFrequency
         if @values.previousFrequency < @values.targetFrequency
-          @values.currentFrequency >= @values.targetFrequency
+          @values.frequency >= @values.targetFrequency
         else if @values.previousFrequency > @values.targetFrequency
-          @values.currentFrequency <= @values.targetFrequency
+          @values.frequency <= @values.targetFrequency
       else
         true
 
@@ -59,6 +60,16 @@ class Soundrive
         f(e)
 
     # private
+
+    _increment: (name, using)->
+      unless @isAtTargetFrequency()
+        @values.fDelta = ( @values.targetFrequency - @values.previousFrequency ) / (@values.sampleRate * @values[using])
+        @values[name] += @values.fDelta
+      else
+        @values[name] = @values.targetFrequency
+
+    _capitalize: (string) ->
+      string.charAt(0).toUpperCase() + string.slice(1)
 
     _recordSample: (sample) ->
       @sample = sample

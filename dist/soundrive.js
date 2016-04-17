@@ -10,25 +10,30 @@ Soundrive = function () {
         options = {};
       }
       this.values = {
-        currentFrequency: 0,
+        frequency: 0,
         sampleRate: 44100,
         type: 'sine',
-        sweepSize: 0,
+        sweep: 0,
         phi: 0,
         delta: 0,
-        fDelta: 0
+        fDelta: 0,
+        amplitude: 100,
+        easeIn: 0,
+        easeOut: 0
       };
       for (option in options) {
         this.values[option] = options[option];
       }
-      (base = this.values).previousFrequency || (base.previousFrequency = this.values.currentFrequency);
-      (base1 = this.values).targetFrequency || (base1.targetFrequency = this.values.currentFrequency);
+      (base = this.values).previousFrequency || (base.previousFrequency = this.values.frequency);
+      (base1 = this.values).targetFrequency || (base1.targetFrequency = this.values.frequency);
+      this.values.sweepIn = this.values.sweep;
+      this.values.sweepOut = this.values.sweep;
       this.sample = void 0;
       this.callbacks = {};
     }
 
     Oscillator.prototype.changeFrequency = function (frequency) {
-      this.values.previousFrequency = this.values.currentFrequency;
+      this.values.previousFrequency = this.values.frequency;
       return this.values.targetFrequency = frequency;
     };
 
@@ -36,24 +41,19 @@ Soundrive = function () {
       if (record == null) {
         record = true;
       }
-      this.sample = Math.sin(this.values.phi);
-      this.values.delta = 2 * Math.PI * this.values.currentFrequency / this.values.sampleRate;
-      if (!this.isAtTargetFrequency()) {
-        this.values.fDelta = (this.values.targetFrequency - this.values.previousFrequency) / (this.values.sampleRate * this.values.sweepSize);
-        this.values.currentFrequency += this.values.fDelta;
-      } else {
-        this.values.currentFrequency = this.values.targetFrequency;
-      }
+      this.sample = Math.sin(this.values.phi) * (this.values.amplitude / 100);
+      this.values.delta = 2 * Math.PI * this.values.frequency / this.values.sampleRate;
+      this._increment('frequency', 'sweep');
       this.values.phi += this.values.delta;
       return this.sample;
     };
 
     Oscillator.prototype.isAtTargetFrequency = function () {
-      if (this.values.currentFrequency !== this.values.targetFrequency) {
+      if (this.values.frequency !== this.values.targetFrequency) {
         if (this.values.previousFrequency < this.values.targetFrequency) {
-          return this.values.currentFrequency >= this.values.targetFrequency;
+          return this.values.frequency >= this.values.targetFrequency;
         } else if (this.values.previousFrequency > this.values.targetFrequency) {
-          return this.values.currentFrequency <= this.values.targetFrequency;
+          return this.values.frequency <= this.values.targetFrequency;
         }
       } else {
         return true;
@@ -93,6 +93,19 @@ Soundrive = function () {
         results.push(f(e));
       }
       return results;
+    };
+
+    Oscillator.prototype._increment = function (name, using) {
+      if (!this.isAtTargetFrequency()) {
+        this.values.fDelta = (this.values.targetFrequency - this.values.previousFrequency) / (this.values.sampleRate * this.values[using]);
+        return this.values[name] += this.values.fDelta;
+      } else {
+        return this.values[name] = this.values.targetFrequency;
+      }
+    };
+
+    Oscillator.prototype._capitalize = function (string) {
+      return string.charAt(0).toUpperCase() + string.slice(1);
     };
 
     Oscillator.prototype._recordSample = function (sample) {
