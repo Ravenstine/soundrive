@@ -2,43 +2,57 @@ class Soundrive
 
   class @Oscillator
     constructor: (options={}) ->
-      @values =
-        frequency        : 0
+      @options   =
         sampleRate       : 44100
         type             : 'sine'
-        sweep            : 0
-        phi              : 0
-        delta            : 0
-        fDelta           : 0
-        amplitude        : 100 # percent
-        easeIn           : 0
-        easeOut          : 0
-      for option of options
-        @values[option] = options[option]
-      @values.previousFrequency ||=  @values.frequency
-      @values.targetFrequency   ||=  @values.frequency
-      @values.sweepIn  = @values.sweep
-      @values.sweepOut = @values.sweep
+      @frequency =
+        value   : 0
+        previous: 0
+        target  : 0
+        ease    : 0
+        phi     : 0
+        pDelta  : 0
+        delta   : 0
+      @amplitude =
+        value   : 100 # percent
+        previous: 0
+        target  : 0
+        ease    : 0
+        delta   : 0
+
+      for t in ['frequency', 'amplitude']
+        for name, value of (options[t] or {})
+          @[t][name] = value
+        @[t].previous ||= @[t].value
+        @[t].target   ||= @[t].value
+
+      @options.sampleRate = options.sampleRate if options.sampleRate
+
       @sample    = undefined
       @callbacks = {}
 
     changeFrequency: (frequency) ->
-      @values.previousFrequency = @values.frequency
-      @values.targetFrequency   = frequency
+      @frequency.previous = @frequency.value
+      @frequency.target   = frequency
+
+    changeAmplitude: (amplitude) ->
+      @amplitude.previous = @amplitude.value
+      @amplitude.target   = amplitude
 
     oscillate: (record=true)->
-      @sample          = Math.sin(@values.phi) * (@values.amplitude / 100)
-      @values.delta    = 2 * Math.PI * @values.frequency / @values.sampleRate
-      @_increment 'frequency', 'sweep'
-      @values.phi              += @values.delta
+      @sample           = Math.sin(@frequency.phi) * (@amplitude.value / 100)
+      @frequency.pDelta = 2 * Math.PI * @frequency.value / @options.sampleRate
+      @_increment 'amplitude'
+      @_increment 'frequency'
+      @frequency.phi   += @frequency.pDelta
       @sample
 
-    isAtTargetFrequency: ->
-      if @values.frequency != @values.targetFrequency
-        if @values.previousFrequency < @values.targetFrequency
-          @values.frequency >= @values.targetFrequency
-        else if @values.previousFrequency > @values.targetFrequency
-          @values.frequency <= @values.targetFrequency
+    isAtTarget: (name) ->
+      if @[name].value != @[name].target
+        if @[name].previous < @[name].target
+          @[name].value >= @[name].target
+        else if @[name].previous > @[name].target
+          @[name].value <= @[name].target
       else
         true
 
@@ -51,25 +65,19 @@ class Soundrive
       @
 
     on: (name, callback) ->
-      @callbacks[name] ||= []
-      @callbacks[name].push callback
+      (@callbacks[name] ||= []).push callback
 
     trigger: (name, e={}) ->
-      @callbacks[name] ||= []
-      for f in @callbacks[name]
-        f(e)
+      f(e) for f in (@callbacks[name] ||= [])
 
     # private
 
     _increment: (name, using)->
-      unless @isAtTargetFrequency()
-        @values.fDelta = ( @values.targetFrequency - @values.previousFrequency ) / (@values.sampleRate * @values[using])
-        @values[name] += @values.fDelta
+      unless @isAtTarget(name)
+        @[name].delta = ( @[name].target - @[name].previous ) / (@options.sampleRate * @[name].ease)
+        @[name].value += @[name].delta
       else
-        @values[name] = @values.targetFrequency
-
-    _capitalize: (string) ->
-      string.charAt(0).toUpperCase() + string.slice(1)
+        @[name].value = @[name].target
 
     _recordSample: (sample) ->
       @sample = sample
@@ -79,7 +87,6 @@ class Soundrive
 if typeof module != 'undefined' and module.exports # if node.js
   module.exports = Soundrive
 else if typeof define == 'function' and define.amd # if AMD
-  define ->
-    Soundrive
+  define -> Soundrive
 else
   window.Soundrive = Soundrive

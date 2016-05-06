@@ -5,55 +5,76 @@ Soundrive = function () {
 
   Soundrive.Oscillator = function () {
     function Oscillator(options) {
-      var base, base1, option;
+      var base, base1, i, len, name, ref, ref1, t, value;
       if (options == null) {
         options = {};
       }
-      this.values = {
-        frequency: 0,
+      this.options = {
         sampleRate: 44100,
-        type: 'sine',
-        sweep: 0,
-        phi: 0,
-        delta: 0,
-        fDelta: 0,
-        amplitude: 100,
-        easeIn: 0,
-        easeOut: 0
+        type: 'sine'
       };
-      for (option in options) {
-        this.values[option] = options[option];
+      this.frequency = {
+        value: 0,
+        previous: 0,
+        target: 0,
+        ease: 0,
+        phi: 0,
+        pDelta: 0,
+        delta: 0
+      };
+      this.amplitude = {
+        value: 100,
+        previous: 0,
+        target: 0,
+        ease: 0,
+        delta: 0
+      };
+      ref = ['frequency', 'amplitude'];
+      for (i = 0, len = ref.length; i < len; i++) {
+        t = ref[i];
+        ref1 = options[t] || {};
+        for (name in ref1) {
+          value = ref1[name];
+          this[t][name] = value;
+        }
+        (base = this[t]).previous || (base.previous = this[t].value);
+        (base1 = this[t]).target || (base1.target = this[t].value);
       }
-      (base = this.values).previousFrequency || (base.previousFrequency = this.values.frequency);
-      (base1 = this.values).targetFrequency || (base1.targetFrequency = this.values.frequency);
-      this.values.sweepIn = this.values.sweep;
-      this.values.sweepOut = this.values.sweep;
+      if (options.sampleRate) {
+        this.options.sampleRate = options.sampleRate;
+      }
       this.sample = void 0;
       this.callbacks = {};
     }
 
     Oscillator.prototype.changeFrequency = function (frequency) {
-      this.values.previousFrequency = this.values.frequency;
-      return this.values.targetFrequency = frequency;
+      this.frequency.previous = this.frequency.value;
+      return this.frequency.target = frequency;
+    };
+
+    Oscillator.prototype.changeAmplitude = function (amplitude) {
+      this.amplitude.previous = this.amplitude.value;
+      return this.amplitude.target = amplitude;
     };
 
     Oscillator.prototype.oscillate = function (record) {
       if (record == null) {
         record = true;
       }
-      this.sample = Math.sin(this.values.phi) * (this.values.amplitude / 100);
-      this.values.delta = 2 * Math.PI * this.values.frequency / this.values.sampleRate;
-      this._increment('frequency', 'sweep');
-      this.values.phi += this.values.delta;
+      this.sample = Math.sin(this.frequency.phi) * (this.amplitude.value / 100);
+      this.frequency.pDelta = 2 * Math.PI * this.frequency.value / this.options.sampleRate;
+      this._increment('amplitude');
+      this._increment('frequency');
+      this.frequency.phi += this.frequency.pDelta;
       return this.sample;
     };
 
-    Oscillator.prototype.isAtTargetFrequency = function () {
-      if (this.values.frequency !== this.values.targetFrequency) {
-        if (this.values.previousFrequency < this.values.targetFrequency) {
-          return this.values.frequency >= this.values.targetFrequency;
-        } else if (this.values.previousFrequency > this.values.targetFrequency) {
-          return this.values.frequency <= this.values.targetFrequency;
+    Oscillator.prototype.isAtTarget = function (name) {
+      if (this[name].value !== this[name].target) {
+        if (this[name].previous < this[name].target) {
+          return this[name].value >= this[name].target;
+        } else if (this[name].previous > this[name].target) {
+          return this[name].value <= this[name].target;
         }
       } else {
         return true;
@@ -76,8 +97,7 @@ Soundrive = function () {
 
     Oscillator.prototype.on = function (name, callback) {
       var base;
-      (base = this.callbacks)[name] || (base[name] = []);
-      return this.callbacks[name].push(callback);
+      return ((base = this.callbacks)[name] || (base[name] = [])).push(callback);
     };
 
     Oscillator.prototype.trigger = function (name, e) {
@@ -85,8 +105,7 @@ Soundrive = function () {
       if (e == null) {
         e = {};
       }
-      (base = this.callbacks)[name] || (base[name] = []);
-      ref = this.callbacks[name];
+      ref = (base = this.callbacks)[name] || (base[name] = []);
       results = [];
       for (i = 0, len = ref.length; i < len; i++) {
         f = ref[i];
@@ -96,16 +115,12 @@ Soundrive = function () {
     };
 
     Oscillator.prototype._increment = function (name, using) {
-      if (!this.isAtTargetFrequency()) {
-        this.values.fDelta = (this.values.targetFrequency - this.values.previousFrequency) / (this.values.sampleRate * this.values[using]);
-        return this.values[name] += this.values.fDelta;
+      if (!this.isAtTarget(name)) {
+        this[name].delta = (this[name].target - this[name].previous) / (this.options.sampleRate * this[name].ease);
+        return this[name].value += this[name].delta;
       } else {
-        return this.values[name] = this.values.targetFrequency;
+        return this[name].value = this[name].target;
       }
-    };
-
-    Oscillator.prototype._capitalize = function (string) {
-      return string.charAt(0).toUpperCase() + string.slice(1);
     };
 
     Oscillator.prototype._recordSample = function (sample) {
