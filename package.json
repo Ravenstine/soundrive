@@ -1,6 +1,6 @@
 {
   "name": "soundrive",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Make awesome sounds in JavaScript.",
   "main": "dist/soundrive.js",
   "scripts": {

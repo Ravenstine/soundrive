@@ -1,9 +1,88 @@
-var Soundrive;
+var Soundrive,
+    extend = function (child, parent) {
+  for (var key in parent) {
+    if (hasProp.call(parent, key)) child[key] = parent[key];
+  }function ctor() {
+    this.constructor = child;
+  }ctor.prototype = parent.prototype;child.prototype = new ctor();child.__super__ = parent.prototype;return child;
+},
+    hasProp = {}.hasOwnProperty;
 
 Soundrive = function () {
   function Soundrive() {}
 
-  Soundrive.Oscillator = function () {
+  Soundrive.Mixer = function () {
+    function Mixer(options) {
+      if (options == null) {
+        options = {};
+      }
+      this.sources = options.sources || [];
+    }
+
+    Mixer.prototype.process = function () {
+      var i, len, ref, sample, source, sourceCount;
+      sample = 0;
+      sourceCount = this.sources.length;
+      ref = this.sources;
+      for (i = 0, len = ref.length; i < len; i++) {
+        source = ref[i];
+        if (source.process) {
+          sample += source.process();
+        } else if (typeof source === 'function') {
+          sample += source();
+        }
+      }
+      return sample / sourceCount;
+    };
+
+    Mixer.prototype.mix = function (source) {
+      this.sources.push(source);
+      return this;
+    };
+
+    Mixer.Mixable = function () {
+      function Mixable(options) {
+        if (options == null) {
+          options = {};
+        }
+        this.sources = options.sources || [];
+      }
+
+      Mixable.prototype.mix = function (source) {
+        var mixer;
+        return mixer = new Mixer({
+          sources: [this, source]
+        });
+      };
+
+      Mixable.prototype.on = function (name, callback) {
+        var base;
+        return ((base = this.callbacks || (this.callbacks = {}))[name] || (base[name] = [])).push(callback);
+      };
+
+      Mixable.prototype.trigger = function (name, e) {
+        var base, f, i, len, ref, results;
+        if (e == null) {
+          e = {};
+        }
+        ref = (base = this.callbacks || (this.callbacks = {}))[name] || (base[name] = []);
+        results = [];
+        for (i = 0, len = ref.length; i < len; i++) {
+          f = ref[i];
+          results.push(f(e));
+        }
+        return results;
+      };
+
+      return Mixable;
+    }();
+
+    return Mixer;
+  }();
+
+  Soundrive.Oscillator = function (superClass) {
+    extend(Oscillator, superClass);
+
     function Oscillator(options) {
       var base, base1, i, len, name, ref, ref1, t, value;
       if (options == null) {
@@ -44,7 +123,6 @@ Soundrive = function () {
         this.options.sampleRate = options.sampleRate;
       }
       this.sample = void 0;
-      this.callbacks = {};
     }
 
     Oscillator.prototype.changeFrequency = function (frequency) {
@@ -57,14 +135,14 @@ Soundrive = function () {
       return this.amplitude.target = amplitude;
     };
 
-    Oscillator.prototype.oscillate = function (record) {
+    Oscillator.prototype.process = function (record) {
       if (record == null) {
         record = true;
       }
       this.sample = Math.sin(this.frequency.phi) * (this.amplitude.value / 100);
       this.frequency.pDelta = 2 * Math.PI * this.frequency.value / this.options.sampleRate;
-      this._increment('amplitude');
-      this._increment('frequency');
+      this._ease('amplitude');
+      this._ease('frequency');
       this.frequency.phi += this.frequency.pDelta;
       return this.sample;
     };
@@ -81,40 +159,7 @@ Soundrive = function () {
       }
     };
 
-    Oscillator.prototype.pipe = function (oscillator) {
-      var sampleA, sampleB, sampleC;
-      sampleA = oscillator.oscillate();
-      sampleB = this.oscillate(false);
-      sampleC = sampleA / 2 + sampleB / 2;
-      this._recordSample(sampleC);
-      this.trigger('pipe', {
-        sample: sampleC,
-        sampleA: sampleA,
-        sampleB: sampleB
-      });
-      return this;
-    };
-
-    Oscillator.prototype.on = function (name, callback) {
-      var base;
-      return ((base = this.callbacks)[name] || (base[name] = [])).push(callback);
-    };
-
-    Oscillator.prototype.trigger = function (name, e) {
-      var base, f, i, len, ref, results;
-      if (e == null) {
-        e = {};
-      }
-      ref = (base = this.callbacks)[name] || (base[name] = []);
-      results = [];
-      for (i = 0, len = ref.length; i < len; i++) {
-        f = ref[i];
-        results.push(f(e));
-      }
-      return results;
-    };
-
-    Oscillator.prototype._increment = function (name, using) {
+    Oscillator.prototype._ease = function (name, using) {
       if (!this.isAtTarget(name)) {
         this[name].delta = (this[name].target - this[name].previous) / (this.options.sampleRate * this[name].ease);
         return this[name].value += this[name].delta;
@@ -132,6 +177,121 @@ Soundrive = function () {
     };
 
     return Oscillator;
+  }(Soundrive.Mixer.Mixable);
+
+  Soundrive.Processors = function () {
+    function Processors() {}
+
+    Processors.Processor = function (superClass) {
+      extend(Processor, superClass);
+
+      function Processor(options) {
+        var name, option;
+        if (options == null) {
+          options = {};
+        }
+        Processor.__super__.constructor.call(this, options);
+        this.options = {
+          influence: 100
+        };
+        for (name in options) {
+          option = options[name];
+          this.options[name] = option;
+        }
+      }
+
+      Processor.prototype.process = function () {
+        var a, b, sample;
+        sample = Processor.__super__.process.call(this);
+        console.log("b: " + sample);
+        a = this.processor(sample) * (this.options.influence / 100);
+        b = sample * ((100 - this.options.influence) / 100);
+        return a + b;
+      };
+
+      Processor.prototype.processor = function (sample) {
+        return sample;
+      };
+
+      return Processor;
+    }(Soundrive.Mixer);
+
+    Processors.Triangle = function (superClass) {
+      extend(Triangle, superClass);
+
+      function Triangle() {
+        return Triangle.__super__.constructor.apply(this, arguments);
+      }
+
+      Triangle.prototype.processor = function (sample) {
+        return Math.asin(sample) / (Math.PI / 2);
+      };
+
+      return Triangle;
+    }(Processors.Processor);
+
+    Processors.Square = function (superClass) {
+      extend(Square, superClass);
+
+      function Square() {
+        return Square.__super__.constructor.apply(this, arguments);
+      }
+
+      Square.prototype.processor = function (sample) {
+        if (sample > 0) {
+          return 1;
+        } else {
+          return -1;
+        }
+      };
+
+      return Square;
+    }(Processors.Processor);
+
+    Processors.Sawtooth = function (superClass) {
+      extend(Sawtooth, superClass);
+
+      function Sawtooth(options) {
+        if (options == null) {
+          options = {
+            direction: 'right'
+          };
+        }
+        Sawtooth.__super__.constructor.call(this, options);
+      }
+
+      Sawtooth.prototype.processor = function (sample) {
+        var delta;
+        if (this.previous && sample < this.previous) {
+          delta = this.difference(sample, this.previous);
+          this.sample = (this.sample || this.previous) + delta;
+        } else {
+          this.sample = sample;
+        }
+        this.previous = sample;
+        return this.sample + this.sample * -(2 / 3);
+      };
+
+      Sawtooth.prototype.correctTangent = function (sample, previous) {
+        if (this.options.direction === 'right') {
+          return sample < this.previous;
+        } else if (this.options.direction === 'left') {
+          return sample > this.previous;
+        }
+      };
+
+      Sawtooth.prototype.difference = function (x, y) {
+        if (x > y) {
+          return x - y;
+        } else {
+          return y - x;
+        }
+      };
+
+      return Sawtooth;
+    }(Processors.Triangle);
+
+    return Processors;
   }();
 
   return Soundrive;

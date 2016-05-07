@@ -5,7 +5,7 @@ Because oscillators in JavaScript shouldn't be *that* hard.
 
 ## Preface
 
-So what's wrong with OscillatorNode?  It's a great API and all but, if you want to unit test your audio filter with an OscillatorNode, you're gonna have a *baaaaaaaad* time.
+So what's wrong with OscillatorNode?  Nothing.
 
 The need for Soundrive came from wanting an oscillator that can smoothly sweep between frequencies while still being easy to use and test both on the browser and server-side.
 
@@ -26,14 +26,14 @@ Example use:
 ```javascript
 const Soundrive = require('soundrive');
 
-var oscillator = new Soundrive.Oscillator({frequency: 12345});
+var oscillator = new Soundrive.Oscillator({frequency: {value: 12345}});
 
 var frameSize = 4096
 var frame     = new Float32Array(frameSize)
 var i = 0;
 
 while (i < frameSize) {
-  frame[i] = oscillator.oscillate();
+  frame[i] = oscillator.process();
   i++;
 }
 
@@ -68,8 +68,10 @@ The following creates a sweep(i.e. chirp) between two frequencies:
 
 ```javascript
 var oscillator = new Soundrive.Oscillator({
-  frequency: 1234,
-  sweepSize: 0.5
+  frequency: {
+    value: 1234,
+    ease: 0.5
+  }
 });
 
 var frameSize = 44100 // one second if that's the sample rate
@@ -79,27 +81,29 @@ var i = 0;
 oscillator.changeFrequency(2345);
 
 while (i < frameSize) {
-  frame[i] = oscillator.oscillate();
+  frame[i] = oscillator.process();
   i++;
 }
 ```
 
 The resulting frame of samples will be 1 second with a 0.5 second transition between 1234hz and 2345hz.
 
-### Pipe
+### Mix
 
-You can "pipe" oscillators together to produce multiple tones.
+You can "mix" oscillators together to produce multiple tones.
 
 ```javascript
-var oscillator1 = new Soundrive.Oscillator({frequency: 770});
-var oscillator2 = new Soundrive.Oscillator({frequency: 852});
+var oscillator1 = new Soundrive.Oscillator({frequency: {value: 770}});
+var oscillator2 = new Soundrive.Oscillator({frequency: {value: 852}});
+
+var mix = oscillator1.mix(oscillator1)
 
 var frameSize = 4096
 var frame     = new Float32Array(frameSize)
 var i = 0;
 
 while (i < frameSize) {
-  frame[i] = oscillator1.pipe(oscillator2);
+  frame[i] = mix.process()
   i++;
 }
 
