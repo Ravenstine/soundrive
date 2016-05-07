@@ -2,6 +2,11 @@ class Soundrive
 
   class @Mixer
     constructor: (options={}) ->
+      @options   =
+        sampleRate : 44100
+        time       : 0
+      for name, option of options
+        @options[name] = option
       @sources = options.sources or []
     process: ->
       sample = 0
@@ -18,20 +23,34 @@ class Soundrive
 
     class @Mixable
       constructor: (options={}) ->
+        @options   =
+          sampleRate : 44100
+          time       : 0     # This is just the number of iterations.
+        for name, option of options
+          @options[name] = option
         @sources = options.sources or []
       mix: (source) ->
         mixer = new Mixer
-          sources: [@, source]
+          sampleRate : @options.sampleRate
+          sources    : [@, source]
       on: (name, callback) ->
         ((@callbacks ||= {})[name] ||= []).push callback
       trigger: (name, e={}) ->
         f(e) for f in ((@callbacks ||= {})[name] ||= [])
+      process: ->
+        @trigger 'process'
+        @_incrementTime()
+
+      # private
+
+      _incrementTime: ->
+        @options.time++
+
+
 
   class @Oscillator extends @Mixer.Mixable
     constructor: (options={}) ->
-      @options   =
-        sampleRate       : 44100
-        type             : 'sine'
+      super(options)
       @frequency =
         value   : 0
         previous: 0
@@ -55,8 +74,6 @@ class Soundrive
 
       @options.sampleRate = options.sampleRate if options.sampleRate
 
-      @sample    = undefined
-
     changeFrequency: (frequency) ->
       @frequency.previous = @frequency.value
       @frequency.target   = frequency
@@ -65,12 +82,13 @@ class Soundrive
       @amplitude.previous = @amplitude.value
       @amplitude.target   = amplitude
 
-    process: (record=true)->
+    process: ->
       @sample           = Math.sin(@frequency.phi) * (@amplitude.value / 100)
       @frequency.pDelta = 2 * Math.PI * @frequency.value / @options.sampleRate
       @_ease 'amplitude'
       @_ease 'frequency'
       @frequency.phi   += @frequency.pDelta
+      @trigger 'process', {sample: @sample, oscillator: @}
       @sample
 
     isAtTarget: (name) ->
@@ -90,11 +108,6 @@ class Soundrive
         @[name].value += @[name].delta
       else
         @[name].value = @[name].target
-
-    _recordSample: (sample) ->
-      @sample = sample
-      @trigger('oscillate', {sample: @sample})
-      sample
 
 
   class @Processors
@@ -128,7 +141,11 @@ class Soundrive
       # waveform.  Because we can't accurately
       # guess the center of the waveform,
       # the result will probably be off-center.
-      constructor: (options={direction: 'right'}) ->
+      #
+      # Right now, it also creates a right-direcitonal
+      # sawtooth but not a reverse sawtooth.  This will
+      # be fixed in the future.
+      constructor: (options={}) ->
         super(options)
       processor: (sample) ->
         if @previous and sample < @previous
@@ -138,13 +155,6 @@ class Soundrive
           @sample = sample
         @previous = sample
         (@sample + (@sample * -(2/3)))
-
-      correctTangent: (sample, previous) ->
-        if @options.direction is 'right'
-          sample < @previous
-        else if @options.direction is 'left'
-          sample > @previous
-
       difference: (x, y) ->
         if x > y
           x - y

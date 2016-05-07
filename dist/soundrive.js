@@ -13,8 +13,17 @@ Soundrive = function () {
 
   Soundrive.Mixer = function () {
     function Mixer(options) {
+      var name, option;
       if (options == null) {
         options = {};
+      }
+      this.options = {
+        sampleRate: 44100,
+        time: 0
+      };
+      for (name in options) {
+        option = options[name];
+        this.options[name] = option;
       }
       this.sources = options.sources || [];
     }
@@ -42,8 +51,17 @@ Soundrive = function () {
 
     Mixer.Mixable = function () {
       function Mixable(options) {
+        var name, option;
         if (options == null) {
           options = {};
+        }
+        this.options = {
+          sampleRate: 44100,
+          time: 0
+        };
+        for (name in options) {
+          option = options[name];
+          this.options[name] = option;
         }
         this.sources = options.sources || [];
       }
@@ -51,6 +69,7 @@ Soundrive = function () {
       Mixable.prototype.mix = function (source) {
         var mixer;
         return mixer = new Mixer({
+          sampleRate: this.options.sampleRate,
           sources: [this, source]
         });
       };
@@ -74,6 +93,15 @@ Soundrive = function () {
         return results;
       };
 
+      Mixable.prototype.process = function () {
+        this.trigger('process');
+        return this._incrementTime();
+      };
+
+      Mixable.prototype._incrementTime = function () {
+        return this.options.time++;
+      };
+
       return Mixable;
     }();
 
@@ -88,10 +116,7 @@ Soundrive = function () {
       if (options == null) {
         options = {};
       }
-      this.options = {
-        sampleRate: 44100,
-        type: 'sine'
-      };
+      Oscillator.__super__.constructor.call(this, options);
       this.frequency = {
         value: 0,
         previous: 0,
@@ -122,7 +147,6 @@ Soundrive = function () {
       if (options.sampleRate) {
         this.options.sampleRate = options.sampleRate;
       }
-      this.sample = void 0;
     }
 
     Oscillator.prototype.changeFrequency = function (frequency) {
@@ -135,15 +159,16 @@ Soundrive = function () {
       return this.amplitude.target = amplitude;
     };
 
-    Oscillator.prototype.process = function (record) {
-      if (record == null) {
-        record = true;
-      }
+    Oscillator.prototype.process = function () {
       this.sample = Math.sin(this.frequency.phi) * (this.amplitude.value / 100);
       this.frequency.pDelta = 2 * Math.PI * this.frequency.value / this.options.sampleRate;
       this._ease('amplitude');
       this._ease('frequency');
       this.frequency.phi += this.frequency.pDelta;
+      this.trigger('process', {
+        sample: this.sample,
+        oscillator: this
+      });
       return this.sample;
     };
 
@@ -166,14 +191,6 @@ Soundrive = function () {
       } else {
         return this[name].value = this[name].target;
       }
-    };
-
-    Oscillator.prototype._recordSample = function (sample) {
-      this.sample = sample;
-      this.trigger('oscillate', {
-        sample: this.sample
-      });
-      return sample;
     };
 
     return Oscillator;
@@ -203,7 +220,6 @@ Soundrive = function () {
       Processor.prototype.process = function () {
         var a, b, sample;
         sample = Processor.__super__.process.call(this);
-        console.log("b: " + sample);
         a = this.processor(sample) * (this.options.influence / 100);
         b = sample * ((100 - this.options.influence) / 100);
         return a + b;
@@ -253,9 +269,7 @@ Soundrive = function () {
 
       function Sawtooth(options) {
         if (options == null) {
-          options = {
-            direction: 'right'
-          };
+          options = {};
         }
         Sawtooth.__super__.constructor.call(this, options);
       }
@@ -270,14 +284,6 @@ Soundrive = function () {
         }
         this.previous = sample;
         return this.sample + this.sample * -(2 / 3);
-      };
-
-      Sawtooth.prototype.correctTangent = function (sample, previous) {
-        if (this.options.direction === 'right') {
-          return sample < this.previous;
-        } else if (this.options.direction === 'left') {
-          return sample > this.previous;
-        }
       };
 
       Sawtooth.prototype.difference = function (x, y) {
