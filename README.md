@@ -96,7 +96,7 @@ You can "mix" oscillators together to produce multiple tones.
 var oscillator1 = new Soundrive.Oscillator({frequency: {value: 770}});
 var oscillator2 = new Soundrive.Oscillator({frequency: {value: 852}});
 
-var mix = oscillator1.mix(oscillator1)
+var mix = oscillator1.mix(oscillator2)
 
 var frameSize = 4096
 var frame     = new Float32Array(frameSize)
