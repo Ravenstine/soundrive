@@ -1,36 +1,31 @@
 Soundrive
 ==========
 
-Because oscillators in JavaScript shouldn't be *that* hard.
+A simple but flexible audio oscillator for ECMAScript.
 
 ## Preface
 
-So what's wrong with OscillatorNode?  Nothing.
+The need for Soundrive came from wanting an oscillator that can smoothly [sweep](https://en.wikipedia.org/wiki/Chirp) between frequencies while still being easy to use in Node.js and browsers.
 
-The need for Soundrive came from wanting an oscillator that can smoothly sweep between frequencies while still being easy to use and test both on the browser and server-side.
-
-It's currently in the **alpha** stage, so some things might not work well or at all.  Right now, it only generates sine waves because that's what I most need it for at the moment.  In the future, I want to add more patterns as well as modulators.  I just want to get this up so I can continue my other work as soon as possible, so it's very incomplete.  But feel free to play around with it!
+To use in the browser, you will probably have to compile it using [Babel](https://babeljs.io/) and/or a tool like [Browserify](http://browserify.org/).
 
 ## Installation
 
 `npm install --save soundrive`
 
-Or to install from HEAD:
-
-`npm install --save Ravenstine/soundrive`
+Yay!  No dependencies!
 
 ## Use
 
-Example use:
+Simplest example:
 
 ```javascript
-const Soundrive = require('soundrive');
+const Soundrive  = require('soundrive'),
+      oscillator = Soundrive.Oscillator.create({frequency: {value: 12345}}),
+      frameSize  = 4096,
+      frame      = new Float32Array(frameSize);
 
-var oscillator = new Soundrive.Oscillator({frequency: {value: 12345}});
-
-var frameSize = 4096
-var frame     = new Float32Array(frameSize)
-var i = 0;
+let i = 0;
 
 while (i < frameSize) {
   frame[i] = oscillator.process();
@@ -39,44 +34,20 @@ while (i < frameSize) {
 
 ```
 
-This would fill up your `frame` with samples for a 12345hz sine wave.
-
-To write to a file on your file system:
-
-```javascript
-const fs = require('fs');
-
-var buffer = new Buffer(4096 * 4);
-
-var i = 0;
-
-while (i < frameSize) {
-  buffer.writeFloatLE(frame[i], i*4);
-  i++;
-}
-
-fs.writeFile("./sine.raw", buffer, 'binary', function(err){
-  if(err){
-    console.log(err);
-  }
-});
-```
-
-This creates a file with raw sample data that you can open up in Audacity through **File > Import**.
-
 The following creates a sweep(i.e. chirp) between two frequencies:
 
 ```javascript
-var oscillator = new Soundrive.Oscillator({
+const oscillator = Soundrive.Oscillator.create({
   frequency: {
     value: 1234,
     ease: 0.5
   }
-});
+}),
 
-var frameSize = 44100 // one second if that's the sample rate
-var frame     = new Float32Array(frameSize)
-var i = 0;
+frameSize = 44100, // one second if that's the sample rate
+frame     = new Float32Array(frameSize);
+
+let i = 0;
 
 oscillator.changeFrequency(2345);
 
@@ -93,14 +64,13 @@ The resulting frame of samples will be 1 second with a 0.5 second transition bet
 You can "mix" oscillators together to produce multiple tones.
 
 ```javascript
-var oscillator1 = new Soundrive.Oscillator({frequency: {value: 770}});
-var oscillator2 = new Soundrive.Oscillator({frequency: {value: 852}});
+const oscillator1 = Soundrive.Oscillator.create({frequency: {value: 770}}),
+      oscillator2 = Soundrive.Oscillator.create({frequency: {value: 852}}),
+      frameSize   = 4096,
+      frame       = new Float32Array(frameSize),
+      mix         = oscillator1.mix(oscillator2);
 
-var mix = oscillator1.mix(oscillator2)
-
-var frameSize = 4096
-var frame     = new Float32Array(frameSize)
-var i = 0;
+let i = 0;
 
 while (i < frameSize) {
   frame[i] = mix.process()
@@ -109,8 +79,7 @@ while (i < frameSize) {
 
 ```
 
-The mechanism of piping is subject to change, but this is a fundamental feature that I want to have implemented.
+## Testing
 
-## Development
+Tests use Mocha.  Use `npm run test` to perform them.
 
-The source is written in CoffeeScript and can be compile to `dist` by running `gulp coffee-src`.
